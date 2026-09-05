@@ -1,0 +1,338 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Region {
+  id                    Int                    @id @default(autoincrement())
+  name                  String                 @unique
+  code                  String                 @unique
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  complaints            Complaint[]
+  loadSheddingSchedules LoadSheddingSchedule[]
+  outages               Outage[]
+  serviceConnections    ServiceConnection[]
+  users                 User[]
+  workOrders            WorkOrder[]
+}
+
+model User {
+  id                 Int               @id @default(autoincrement())
+  firstName          String
+  lastName           String
+  email              String            @unique
+  phone              String?           @unique
+  passwordHash       String
+  role               Role              @default(CUSTOMER)
+  isActive           Boolean           @default(true)
+  regionId           Int?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  complaints         Complaint[]
+  customerAccounts   CustomerAccount[]
+  staffProfile       StaffProfile?
+  region             Region?           @relation(fields: [regionId], references: [id])
+  assignedWorkOrders WorkOrder[]       @relation("AssignedWorkOrders")
+}
+
+model LoadSheddingSchedule {
+  id          Int            @id @default(autoincrement())
+  regionId    Int
+  title       String
+  description String?
+  startAt     DateTime
+  endAt       DateTime
+  status      ScheduleStatus @default(SCHEDULED)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  region      Region         @relation(fields: [regionId], references: [id])
+  outages     Outage[]
+}
+
+model Outage {
+  id                    Int                   @id @default(autoincrement())
+  regionId              Int
+  scheduleId            Int?
+  type                  OutageType
+  status                OutageStatus          @default(REPORTED)
+  cause                 String?
+  description           String?
+  startedAt             DateTime
+  expectedRestorationAt DateTime?
+  restoredAt            DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  complaints            Complaint[]
+  region                Region                @relation(fields: [regionId], references: [id])
+  schedule              LoadSheddingSchedule? @relation(fields: [scheduleId], references: [id])
+}
+
+model Complaint {
+  id          Int               @id @default(autoincrement())
+  userId      Int
+  regionId    Int
+  outageId    Int?
+  title       String
+  description String
+  status      ComplaintStatus   @default(OPEN)
+  priority    ComplaintPriority @default(MEDIUM)
+  location    String?
+  resolvedAt  DateTime?
+  resolution  String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  outage      Outage?           @relation(fields: [outageId], references: [id])
+  region      Region            @relation(fields: [regionId], references: [id])
+  user        User              @relation(fields: [userId], references: [id])
+  workOrders  WorkOrder[]
+}
+
+model WorkOrder {
+  id              Int                   @id @default(autoincrement())
+  complaintId     Int
+  assignedToId    Int?
+  regionId        Int
+  title           String
+  description     String?
+  status          WorkOrderStatus       @default(PENDING)
+  priority        WorkOrderPriority     @default(MEDIUM)
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  resolution      String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  fieldActivities FieldActivity[]
+  assignedTo      User?                 @relation("AssignedWorkOrders", fields: [assignedToId], references: [id])
+  complaint       Complaint             @relation(fields: [complaintId], references: [id])
+  region          Region                @relation(fields: [regionId], references: [id])
+  assignments     WorkOrderAssignment[]
+}
+
+model WorkOrderAssignment {
+  id          Int              @id @default(autoincrement())
+  workOrderId Int
+  staffId     Int
+  status      AssignmentStatus @default(ASSIGNED)
+  assignedAt  DateTime         @default(now())
+  acceptedAt  DateTime?
+  completedAt DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  staff       StaffProfile     @relation(fields: [staffId], references: [id])
+  workOrder   WorkOrder        @relation(fields: [workOrderId], references: [id])
+
+  @@unique([workOrderId, staffId])
+}
+
+model CustomerAccount {
+  id          Int                 @id @default(autoincrement())
+  userId      Int
+  accountNo   String              @unique
+  status      AccountStatus       @default(ACTIVE)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  bills       Bill[]
+  user        User                @relation(fields: [userId], references: [id])
+  payments    Payment[]
+  connections ServiceConnection[]
+}
+
+model ServiceConnection {
+  id             Int                     @id @default(autoincrement())
+  accountId      Int
+  regionId       Int
+  meterNumber    String                  @unique
+  connectionType String
+  address        String
+  status         ServiceConnectionStatus @default(PENDING)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  account        CustomerAccount         @relation(fields: [accountId], references: [id])
+  region         Region                  @relation(fields: [regionId], references: [id])
+}
+
+model Bill {
+  id         Int             @id @default(autoincrement())
+  accountId  Int
+  billNumber String          @unique
+  amount     Decimal
+  issuedAt   DateTime        @default(now())
+  dueDate    DateTime
+  status     BillStatus      @default(PENDING)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  account    CustomerAccount @relation(fields: [accountId], references: [id])
+  payments   Payment[]
+}
+
+model Payment {
+  id        Int             @id @default(autoincrement())
+  accountId Int
+  billId    Int?
+  reference String          @unique
+  amount    Decimal         @db.Decimal(12, 2)
+  method    PaymentMethod
+  status    PaymentStatus   @default(PENDING)
+  paidAt    DateTime?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  account   CustomerAccount @relation(fields: [accountId], references: [id])
+  bill      Bill?           @relation(fields: [billId], references: [id])
+}
+
+model StaffProfile {
+  id              Int                   @id @default(autoincrement())
+  userId          Int                   @unique
+  employeeNumber  String                @unique
+  department      StaffDepartment
+  status          StaffStatus           @default(ACTIVE)
+  jobTitle        String
+  hireDate        DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  fieldActivities FieldActivity[]
+  user            User                  @relation(fields: [userId], references: [id])
+  assignments     WorkOrderAssignment[]
+}
+
+model FieldActivity {
+  id           Int               @id @default(autoincrement())
+  workOrderId  Int
+  staffId      Int
+  activityType FieldActivityType
+  description  String?
+  performedAt  DateTime          @default(now())
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  staff        StaffProfile      @relation(fields: [staffId], references: [id])
+  workOrder    WorkOrder         @relation(fields: [workOrderId], references: [id])
+}
+
+enum Role {
+  CUSTOMER
+  STAFF
+  ADMIN
+  FINANCE
+}
+
+enum ScheduleStatus {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
+enum OutageType {
+  PLANNED
+  UNPLANNED
+}
+
+enum OutageStatus {
+  REPORTED
+  ACTIVE
+  RESOLVED
+}
+
+enum ComplaintStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  REJECTED
+}
+
+enum ComplaintPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum WorkOrderStatus {
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum WorkOrderPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum ServiceConnectionStatus {
+  PENDING
+  ACTIVE
+  DISCONNECTED
+  SUSPENDED
+}
+
+enum BillStatus {
+  PENDING
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK
+  MOBILE_MONEY
+  CARD
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESSFUL
+  FAILED
+  REVERSED
+}
+
+enum StaffStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+  SUSPENDED
+}
+
+enum StaffDepartment {
+  CUSTOMER_SERVICE
+  FIELD_OPERATIONS
+  ENGINEERING
+  FINANCE
+  ADMINISTRATION
+  IT
+}
+
+enum AssignmentStatus {
+  ASSIGNED
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum FieldActivityType {
+  INSPECTION
+  REPAIR
+  MAINTENANCE
+  INSTALLATION
+  RESTORATION
+  METER_CHECK
+  OTHER
+}
