@@ -57,3 +57,7 @@ app.listen(PORT, () => {
 const loadSheddingRoutes = require("./routes/loadshedding.routes");
 
 app.use("/api/load-shedding", loadSheddingRoutes);
+
+const outageRoutes = require("./routes/outage.routes");
+// ...
+app.use("/api/outages", outageRoutes);
