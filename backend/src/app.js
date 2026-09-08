@@ -61,3 +61,7 @@ app.use("/api/load-shedding", loadSheddingRoutes);
 const outageRoutes = require("./routes/outage.routes");
 // ...
 app.use("/api/outages", outageRoutes);
+
+const complaintRoutes = require("./routes/complaint.routes");
+// ...
+app.use("/api/complaints", complaintRoutes);
