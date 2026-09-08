@@ -4,6 +4,8 @@ require("dotenv").config();
 
 const regionRoutes = require("./routes/region.routes");
 
+const userRoutes = require("./routes/user.routes");
+
 const prisma = require("./lib/prisma");
 
 const app = express();
@@ -11,6 +13,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use("/api/regions", regionRoutes);
+app.use("/api/users", userRoutes);
 
 
 // Home route
